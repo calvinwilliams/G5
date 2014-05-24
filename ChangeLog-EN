@@ -1,0 +1,22 @@
+ver 1.2.2	2014-05-24	calvin
+		* add english document
+
+ver 1.2.1	2014-05-11	calvin
+		* add command arguments for runing as windows service
+		* fixed a bug : data hungry on sending slow than receiving on duplex communication transfer
+		* fixed a bug : discard some properties on export rules
+
+ver 1.2.0	2014-04-19	calvin
+		* Add #include <limits.h>
+		* Support WINDOWS,like UNIX ( select model )
+		
+ver 1.1.0	2014-04-12	calvin
+		* optimize forward session unit
+		* Add code for recv more than send on nonblock-mode
+		* Add rule property "timeout"
+		* Add client property "maxclients"
+
+ver 1.0.0	2014-03-29	calvin
+		* Create
+		* Support Linux ( epoll model )
+

@@ -1,0 +1,235 @@
+Communication forward, the load balancing dispenser - G5
+
+1.Overview
+	G5 is a high performance high concurrent load, easy to use, support the remote management of the configuration of lightweight TCP/IP communications forwarding && load balancing dispenser communication software. Based on epoll(ET) event driven non-block all asynchronous unlocked framework implementations (degradation on UNIX,WINDOWS operating system for the select implementation), can run on Linux, UNIX, and WINDOWS and other mainstream operating system. 
+	G5 support all TCP application layer protocol, which means that not only can be used for website HTTP service, can also be used in the SMTP, POP, FTP and other TCP application protocol. 
+	G5 support almost all the major load balancing algorithm, such as polling, minimum number of connections, minimum response time, etc. 
+	Usage scenario is as follows: 
+	* A simple TCP communications forwarding
+	* Working with no load balancing communication software to realize load balance, avoid modification works and risk
+	* The reverse proxy communication gateway for website 
+
+2.Development background 
+	That day , I chated with system operational boss, talk about F5, the price is too expensive , complicated functions, do not show the corresponding value. Because I have developed a communication middleware, with soft realize the load balance, have been used for many years, suddenly want to realize another pure communication load balancing dispenser, and share to everyone. 
+	At home, searched the similar software on internet about technical requirements
+	
+	Your goal is as follows: 
+	* Support the short/long TCP, follow-up will also support the UDP
+	* Has nothing to do with the application layer protocols , support HTTP, FTP, SMTP, POP, TELNET, SSH, and so on , all the application layer protocol
+	* Stable and efficient, under Linux preferred epoll (ET), all asynchronous design; WINDOWS and unix-like select is used to implement
+	* Forward distribution rule configuration files; Also support the remote online management rules, and the query condition
+	* Supports a variety of mainstream load balancing algorithm
+	* Light source code and executable size, concept is simple, also facilitate their compilation
+	
+	Support load balancing algorithm as follows:
+	* The main-standby mode, which has been connected the first target address, if the first target address refused, automatic switch to the next destination address
+	* Polling mode, put all the target address in order to recycle
+	* minimum number of connections mode, select the current minimum connections in the target address set goals
+	* Minimum response time mode, selected historical data exchange in the target address set the fastest goal
+	* Random mode, random select the target address
+	* HASH mode, according to the source address to calculate the HASH to get a fixed target address
+	
+	Complete implementation based on epoll(ET) of non-blocking all asynchronous framework of application layer:
+	* Based on epoll (ET) event processing application layer framework
+	* The accept client connections and turn even the server connect the jam asynchronous implementation
+	* After recv client data forwarding the send the service side, when forwarding speed is less than receiving , asynchronous implementation case of congestion
+	* Client and server requests and responses on the forward end concurrent isolation
+	
+	take a good name, relative to hard to realize named F5, as soft implementation named G5 ^_^
+	
+3.Install
+	Download from http://git.oschina.net/calvinwilliams/G5 source code installation package in your temporary directory
+	$ tar xvzf G5-x.x.x.tar.gz
+	$ cd G5-x.x.x/src
+	$ make -f makefile.Linux clean
+	$ make -f makefile.Linux install
+	Because only a pair of source files, so the compiler links soon, also facilitate compiler optimizations, easier for you to manually compile too.
+	If it is not an error, G5 is installed under the /usr/bin/ .
+	
+4.Use 
+4.1.Command line arguments 
+	Without parameters to perform G5 will show the information such as version, command line parameters
+	$ G5
+	G5 - TCP Transfer && Load-Balance Dispenser
+	v1.2.1 build Apr  6 2014 15:00:31 WITH 100:1024:4096,10:3:100,64
+	Copyright by calvin 2014
+	Email : calvinwilliams.c@gmail.com
+	
+	USAGE : G5 -f config_pathfilename [ -r forward_rule_maxcount ] [ -s forward_session_maxcount ] [ -b transfer_bufsize ] [ -d ]
+	
+4.2.Startup
+	Because G5 is a tool, so the user interface design is simpler
+	To write a distributing rule configuration file
+	
+	$ cat demo.conf
+	admin G 192.168.1.54:* - 192.168.1.54:8060 ;
+	webdog MS 192.168.1.54:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	webdog2 RR *.*.*.*:* - 192.168.1.54:8080 > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	As G5 only a command line argument -f must be started
+	
+	$ G5 -f demo.conf
+	G5 - TCP Transfer && Load-Balance Dispenser
+	v1.2.1 build Apr 12 2014 03:57:33 WITH 100:1024:4096,10:3:100,64
+	Copyright by calvin 2014
+	Email : calvinwilliams.c@gmail.com
+	forward_rule_maxcount    [100]
+	forward_session_maxcount [1024]
+	transfer_bufsize         [4096]bytes
+	epoll_create ok #3#
+	2014-04-12 03:59:05 | admin G 192.168.1.54:* - 192.168.1.54:8060(LISTEN)#5# ;
+	2014-04-12 03:59:05 | webdog MS 192.168.1.54:* 192.168.1.79:* - 192.168.1.54:8070(LISTEN)#7# > 192.168.1.79:8088 ;
+	2014-04-12 03:59:05 | webdog2 RR *.*.*.*:* - 192.168.1.54:8080(LISTEN)#8# > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	...
+	
+	Produce all information to the standard output, the output error, if the boot parameters with the -d, also will output all debugging information, such as connection, disconnection, data distribution  and so on .
+	
+	I simulated launch an HTTP request
+	
+	$ lynx http://192.168.1.54:8080/index.php
+	
+	G5 produces the following information on the standard output
+	
+	2014-04-12 03:60:05 | forward2 [192.168.1.54:43477]#3# - [192.168.1.54:8080]#7# > [192.168.1.79:8089]#8#
+	2014-04-12 03:60:05 | transfer #3# [324]bytes to #8#
+	2014-04-12 03:60:05 | transfer #8# [257]bytes to #3#
+	2014-04-12 03:60:05 | close #8# recv 0
+	
+	192.168.1.54:43477(lynx) connection 192.168.1.54:8080(G5) is forwarded to the web server 192.168.1.79:8089(apache)
+	Lynx HTTP requests sent 324 bytes to the web server 
+	From the web server lynx receives the HTTP response 257 bytes 
+	The service side first disconnect
+	
+	Generally use nohup make it into a daemon, directed the output to the file 
+	
+	$ nohup G5 demo.conf >demo.log 2>&1 &
+	
+4.3.Shutdown
+	Don't mention it, directly kill pid. 
+
+4.4.Run as a WINDOWS service 
+	Install as WINDOWS service 
+	
+	$ G5 ... --install-service
+	
+	Uninstall the WINDOWS service 
+	
+	$ G5 ... --uninstall-service
+	
+5.Configuration file 
+	a forwarding rules in configuration files, each rule is composed of three paragraphs: rule name, type and rules entities, between separated with white characters (Spaces or TAB). 
+	
+5.1.Rule name 
+	A unique identifier that rule, easy to add, modify, and delete rules. 
+	
+5.2.Rule mode
+	G  : show that the rule is online management, or in some communication distribution algorithm. The implementation algorithm is listed below 
+	MS : the main-standby mode
+	RR : polling mode
+	LC : minimum number of connections mode
+	RT : minimum response time mode
+	RD : random mode
+	HS : HASH mode
+	
+5.3.Rules entity
+	Format for "source address collection - a local forward collection > set the target address ;" , three of whom address set can contain one or the white characters address list. A single address consists of "IP:PORT". Source in a single address IP and PORT can use the '*' and '? 'wildcard.
+	When only one destination address, it's meaningless to communication distribution algorithm.
+	
+5.4.Attribute
+	Rule type optional additional attributes set format as "(name1 value1 name2 value2 name3 value3 ...)", between the separated with white characters (Spaces or TAB). Attributes are currently available.
+		timeout : seconds
+		maxclient : maximum number of client sessions (global)
+	Rules within the entity collection source address optional additional set contract rule type attribute set. Attributes are currently available
+		maxclient : biggest client number of sessions (single rule collection entity within the source address)
+	
+5.5.Sample
+	Back to explain the show in front of the configuration file
+	
+	$ cat demo.conf
+	# Only allow native 192.168.1.54 connected to G5 online management rules, manage connection idle timeout for 5 minutes, when the timeout forcibly disconnected
+	admin G ( timeout 300 ) 192.168.1.54:* - 192.168.1.54:8060 ;
+	# All TCP connections to the local native port 8070 forwarded to 192.168.1.79:8088
+	# For communication across the network segment forwarding, idle timeout for 2 minutes, when the timeout forcibly disconnected, the biggest client number of sessions for five, redundant connection will be forced to disconnect
+	webdog MS ( timeout 120 ) 192.168.1.54:* 192.168.1.79:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	# 允许所有主机连接192.168.1.79:8089，并以轮询算法分发给三个服务器192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091
+	# To allow all hosts to connect 192.168.1.79:8089, and distributed to three servers to polling algorithm 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091
+	# Used for front-end load balancing communication gateway website
+	webdog2 RR *.*.*.*:* ( maxclients 5 ) - 192.168.1.54:8080 > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	
+	Also simple?
+	
+6.Online management
+	G5 at startup must specify a configuration file to load all the rules and to work, also supports remote connections on port online management rules, using Telnet	
+	$ telnet 192.168.1.54 8060
+	Trying 192.168.1.54...
+	Connected to rhel54 (192.168.1.54).
+	Escape character is '^]'.
+	>
+	
+	Behind the '>' for the input prompt, you can type the command 
+	ver : Display G5 version and compile date/time
+	quit : Disconnect the management
+	list rules : Show the current all forwarding rules
+	add rule (... rule ...) : New forwarding rules
+	modify rule (... rule ...) : Modify the forwarding rules
+	remove rule (ruleid) : Delete forwarding rules
+	dump rule : Save all forwarding rules to the specified in the configuration file when it is started . (be careful)
+	list forwards : Show the current forward all the connection information
+	
+	Use the sample
+	
+	$ telnet 192.168.1.54 8060
+	Trying 192.168.1.54...
+	Connected to rhel54 (192.168.1.54).
+	Escape character is '^]'.
+	> ver
+	version v1.0.0 build Apr  3 2014 08:05:54
+	> list rules
+	    1 : admin G ( timeout 300 ) 192.168.1.54:* ( conntions[1/2] ) - 192.168.1.54:8060 ;
+	    2 : webdog MS ( timeout 120 ) 192.168.1.54:* 192.168.1.79:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	    3 : webdog2 RR *.*.*.*:* ( conntions[0/100] ) - 192.168.1.54:8080 > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	> add rule webdog3 MS 192.168.1.54:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	add forward rule ok
+	> modify rule webdog3 HS 192.168.1.54:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	modify forward rule ok
+	> remove rule webdog3
+	remove forward rule ok
+	> dump rules
+	dump all forward rules ok
+	> list forwards
+	    1 : LISTEN [192.168.1.54:8060]#5#
+	    2 : LISTEN [192.168.1.54:8060]#6#
+	    3 : LISTEN [192.168.1.54:8070]#7#
+	    4 : LISTEN [192.168.1.54:8080]#8#
+	    5 : CLIENT [192.168.1.54:54162]#4# - MANAGE [192.168.1.54:8060]#5#
+	 2138 : CLIENT [192.168.1.54:39869]#11# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#12# connected
+	 2139 : CLIENT [192.168.1.54:39869]#11# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#12# connected
+	 2140 : CLIENT [192.168.1.54:39871]#27# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8091]#28# connected
+	 2141 : CLIENT [192.168.1.54:39871]#27# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#28# connected
+	 2142 : CLIENT [192.168.1.54:39873]#17# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8089]#18# connected
+	 2143 : CLIENT [192.168.1.54:39875]#25# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#26# connected
+	 2144 : CLIENT [192.168.1.54:39875]#25# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#26# connected
+	 2145 : CLIENT [192.168.1.54:39873]#17# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8089]#18# connected
+	 2146 : CLIENT [192.168.1.54:39877]#21# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8091]#22# connected
+	 2147 : CLIENT [192.168.1.54:39877]#21# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#22# connected
+	 2148 : CLIENT [192.168.1.54:39879]#9# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8089]#10# connected
+	 2149 : CLIENT [192.168.1.54:39879]#9# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8089]#10# connected
+	 2150 : CLIENT [192.168.1.54:39881]#15# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#16# connected
+	 2151 : CLIENT [192.168.1.54:39881]#15# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#16# connected
+	 2152 : CLIENT [192.168.1.54:39883]#19# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8091]#20# connected
+	 2153 : CLIENT [192.168.1.54:39884]#23# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8089]#24# connected
+	 2154 : CLIENT [192.168.1.54:39884]#23# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8089]#24# connected
+	 2155 : CLIENT [192.168.1.54:39883]#19# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#20# connected
+	 2156 : CLIENT [192.168.1.54:39887]#13# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#14# connected
+	 2157 : CLIENT [192.168.1.54:39887]#13# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#14# connected
+	> quit
+	Connection closed by foreign host.
+	$
+	
+	Note: careful 'dump rules'
+	
+8.The last
+	As a load balance forward distribution network communication tool, realize the basic design goals, and publish it to the open source world, welcome to use.
+	Source code as G5 epoll (ET) + all asynchronous integrated using the sample reference for everybody to learn, welcome criticism and corrections.
+	Welcome to contact me if you have questions or Suggestions
+	Project home page : https://github.com/calvinwilliams/G5
+	The author email : calvinwilliams.c@gmail.com

@@ -1,0 +1,437 @@
+通讯转发、(负载均衡)通讯分发器 - G5
+
+1.概述
+	G5是一款高性能高并发负载、易配置使用、支持远程管理的轻量级TCP/IP的通讯转发、(负载均衡)通讯分发器软件。基于epoll(ET)事件驱动非堵塞全异步无锁框架实现（在非Linux操作系统上退化为select实现），能运行在Linux、UNIX和WINDOWS等多种主流操作系统上。
+	G5支持所有TCP应用层协议，这意味着不仅可以用于网站HTTP服务，还能用在SMTP、POP、FTP上等，甚至非常见TCP应用协议。
+	G5支持几乎所有主流负载均衡算法，如轮询、最少连接数、最小响应时间等。
+	使用场景如下：
+	* 简单的TCP通讯转发
+	* 与无负载均衡功能的通讯软件配合实现负载均衡分发，避免改造通讯软件带来的工作量和风险
+	* 网站反向代理通讯网关
+
+2.开发背景
+	今天和系统运维的老大聊天，谈到一直在用的F5，行里对其评价为价格过高、功能复杂难懂，没有发挥相应的价值。因为以前我曾经给行里开发过一个通讯中间件，附带软实现了负载均衡，几年使用下来一直效果不错，突然想自己再软实现一个纯负载均衡通讯分发器，并开源分享给大家。
+	说干就干，回到家，搜了一下网上同类软件，整理技术需求，
+	软件定义如下：
+	基于规则的通讯转发、分发。客户端连入时，根据来源网络地址和本地侦听端口查询转发规则，参照负载均衡算法分发到目标网络地址集合中的其中一个。
+	
+	实现目标如下：
+	* 支持长/短TCP，后续还会支持UDP
+	* 与应用层协议无关，即支持HTTP,FTP,SMTP,POP,TELNET,SSH等等所有应用层协议
+	* 稳定高效，Linux下首选epoll(ET模式)，全异步设计；WINDOWS和类UNIX用select实现
+	* 转发分发规则配置文件；也支持远程在线管理规则，以及查询状态
+	* 支持多种主流负载均衡算法
+	* 源码和可执行程序体型轻巧，概念简单，使用快捷
+	
+	支持负载均衡算法有：
+	* 主备模式，即一直连接第一个目标地址，如果第一个目标地址故障了，切换到下一个目标地址
+	* 轮询模式，把所有目标地址按次序依次循环使用
+	* 最少连接数模式，在目标地址集合中挑选当前最少连接的目标
+	* 最小响应时间模式，在目标地址集合中挑选历史数据交换最快的目标
+	* 随机模式，随机选择目标地址
+	* HASH模式，根据来源地址计算HASH得到一个唯一固定的目标地址
+	
+	完整实现基于epoll(ET)的非堵塞全异步应用层框架，主要包含以下内容：
+	* 基于epoll(ET)事件处理应用层框架。
+	* accept客户端连接后转连服务端connect的非堵塞异步实现。
+	* recv客户端数据后转发send服务端时，当转发速度小于接收速度情况下的非堵塞异步实现。
+	* 客户端和服务端的请求和响应在转发端的并发隔离。
+	
+	研发之前，取个好听的名字，相对于硬实现F5，就取名为软实现G5吧 ^_^
+	经过5个晚上的奋笔疾书，捣鼓出第一版，源代码只有一个.c(2400行)和一个.h文件(260行)，编译链接出可执行程序约70KB大小。
+	
+3.安装部署
+	从http://git.oschina.net/calvinwilliams/G5下载源码安装包，在你的临时目录解开
+	$ tar xvzf G5-x.x.x.tar.gz
+	$ cd G5-x.x.x/src
+	$ make -f makefile.Linux clean
+	$ make -f makefile.Linux install
+	因为只有一对源文件，所以编译链接很快，也便于编译器优化，更便于你自己手工编译。
+	如果不报错的话，可执行程序G5就安装到/usr/bin/下了。
+	
+4.基本使用
+4.1.命令行参数
+	不带参数执行G5会显示版本、命令行参数说明等信息
+	$ G5
+	G5 - tcp LB dispatch
+	v1.0.0 build Apr  6 2014 15:00:31 WITH 100:1024:4096,10:3:100,64
+	Copyright by calvin 2014
+	Email : calvinwilliams.c@gmail.com
+	
+	USAGE : G5 -f config_pathfilename [ -r forward_rule_maxcount ] [ -s forward_session_maxcount ] [ -b transfer_bufsize ] [ -d ]
+	
+4.2.启动
+	因为是工具型软件，所以用户界面设计的比较简单，自行编写一个分发规则配置文件
+	$ cat demo.conf
+	admin G 192.168.1.54:* - 192.168.1.54:8060 ;
+	webdog MS 192.168.1.54:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	webdog2 RR *.*.*.*:* - 192.168.1.54:8080 > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	作为G5唯一一个必须的命令行参数-f启动
+	$ G5 -f demo.conf
+	G5 - tcp LB dispatch
+	v1.1.0 build Apr 12 2014 03:57:33 WITH 100:1024:4096,10:3:100,64
+	Copyright by calvin 2014
+	Email : calvinwilliams.c@gmail.com
+	forward_rule_maxcount    [100]
+	forward_session_maxcount [1024]
+	transfer_bufsize         [4096]bytes
+	epoll_create ok #3#
+	2014-04-12 03:59:05 | admin G 192.168.1.54:* - 192.168.1.54:8060(LISTEN)#5# ;
+	2014-04-12 03:59:05 | webdog MS 192.168.1.54:* 192.168.1.79:* - 192.168.1.54:8070(LISTEN)#7# > 192.168.1.79:8088 ;
+	2014-04-12 03:59:05 | webdog2 RR *.*.*.*:* - 192.168.1.54:8080(LISTEN)#8# > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	...
+	之后产生的所有普通信息、错误都输出到标准输出、错误输出上，如果启动参数加上-d，则还会输出所有调试信息，如连接、断开、数据分发
+	
+	我模拟发起一个HTTP请求
+	$ lynx http://192.168.1.54:8080/index.php
+	G5的标准输出上产生如下信息
+	2014-04-12 03:60:05 | forward2 [192.168.1.54:43477]#3# - [192.168.1.54:8080]#7# > [192.168.1.79:8089]#8#
+	2014-04-12 03:60:05 | transfer #3# [324]bytes to #8#
+	2014-04-12 03:60:05 | transfer #8# [257]bytes to #3#
+	2014-04-12 03:60:05 | close #8# recv 0
+	说明一下
+	192.168.1.54:43477(lynx)连接192.168.1.54:8080(G5)被转发到网站服务器192.168.1.79:8089(apache)
+	lynx发送了HTTP请求324字节给网站服务器
+	lynx从网站服务器接收了HTTP响应257字节
+	服务端首先断开连接
+	
+	一般都使用nohup使其变为守护进程，输出导向到文件
+	$ nohup G5 demo.conf >demo.log 2>&1 &
+	
+4.3.停止
+	别客气，直接kill (pid)即可。
+
+4.4.作为WINDOWS服务运行
+	安装作为WINDOWS服务
+	$ G5 ... --install-service
+	
+	卸载WINDOWS服务
+	$ G5 ... --uninstall-service
+	
+5.配置文件
+	配置文件里一行为一条转发规则，每条规则由三大段组成：规则名称、规则类型和规则实体，之间用白字符（空格、TAB）隔开。
+	
+5.1.规则名称
+	唯一标识该规则，便于新增、修改和删除规则。
+	
+5.2.规则类型
+	说明该规则是在线管理(G)，还是以某种通讯分发算法。目前实现的算法列表如下
+	MS : 主备模式
+	RR : 轮询模式
+	LC : 最少连接数模式
+	RT : 最小响应时间模式
+	RD : 随机模式
+	HS : HASH模式
+	
+5.3.规则实体
+	格式为"来源地址集合 - 本地转发地址集合 > 目标地址集合 ;"，其中三个地址集合内可以包含一个地址或白字符隔开的地址列表。单个地址由"IP:PORT"组成。来源单个地址中的IP和PORT可以使用'*'和'?'通配。当只有一个目标地址时，通讯分发算法就没有意义了。
+	
+5.4.属性
+	规则类型可选追加属性集合格式为"( 属性1名称 属性1值 属性2名称 属性2值 ... )"，之间用白字符（空格、TAB）隔开。目前可用的属性有
+		timeout 秒数
+		maxclient 最大客户端会话数量（全局）
+	规则实体内来源地址集合可选追加属性集合同规则类型属性集合。目前可用的属性有
+		maxclient 最大客户端会话数量（单个规则实体内来源地址集合）
+	
+5.5.示例
+	回来解释一下前面展示的配置文件
+	$ cat demo.conf
+	# 只允许本机192.168.1.54连接到G5在线管理规则，管理连接空闲超时为5分钟，超时时强制断开
+	admin G ( timeout 300 ) 192.168.1.54:* - 192.168.1.54:8060 ;
+	# 本地所有TCP连接到本机8070端口时统统转发到192.168.1.79:8088
+	# 用于跨网段的通讯转发，空闲超时为2分钟，超时时强制断开，最大客户端会话数量为5个，多余连接将被强制断开
+	webdog MS ( timeout 120 ) 192.168.1.54:* 192.168.1.79:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	# 允许所有主机连接192.168.1.79:8089，并以轮询算法分发给三个服务器192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091
+	# 用于网站前端负载均衡通讯节点
+	webdog2 RR *.*.*.*:* ( maxclients 5 ) - 192.168.1.54:8080 > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	还简单吧
+	
+6.在线管理
+	G5在启动时必须指定一个配置文件装载所有规则并以之工作，也支持远程连接上管理端口在线管理规则，用telnet即可
+	$ telnet 192.168.1.54 8060
+	Trying 192.168.1.54...
+	Connected to rhel54 (192.168.1.54).
+	Escape character is '^]'.
+	>
+	'>'为输入提示符，后面可以键入的命令有
+	ver : 显示G5版本及编译日期时间
+	quit : 断开管理连接
+	list rules : 显示当前所有转发规则
+	add rule (...规则...) : 新增转发规则
+	modify rule (...规则...) : 修改转发规则
+	remove rule (规则名称) : 删除转发规则
+	dump rule : 保存所有转发规则到启动时指定的配置文件中
+	list forwards : 显示当前所有转发连接信息
+	
+	使用示例
+	$ telnet 192.168.1.54 8060
+	Trying 192.168.1.54...
+	Connected to rhel54 (192.168.1.54).
+	Escape character is '^]'.
+	> ver
+	version v1.0.0 build Apr  3 2014 08:05:54
+	> list rules
+	    1 : admin G ( timeout 300 ) 192.168.1.54:* ( conntions[1/2] ) - 192.168.1.54:8060 ;
+	    2 : webdog MS ( timeout 120 ) 192.168.1.54:* 192.168.1.79:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	    3 : webdog2 RR *.*.*.*:* ( conntions[0/100] ) - 192.168.1.54:8080 > 192.168.1.79:8089 192.168.1.79:8090 192.168.1.79:8091 ;
+	> add rule webdog3 MS 192.168.1.54:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	add forward rule ok
+	> modify rule webdog3 HS 192.168.1.54:* - 192.168.1.54:8070 > 192.168.1.79:8088 ;
+	modify forward rule ok
+	> remove rule webdog3
+	remove forward rule ok
+	> dump rules
+	dump all forward rules ok
+	> list forwards
+	    1 : LISTEN [192.168.1.54:8060]#5#
+	    2 : LISTEN [192.168.1.54:8060]#6#
+	    3 : LISTEN [192.168.1.54:8070]#7#
+	    4 : LISTEN [192.168.1.54:8080]#8#
+	    5 : CLIENT [192.168.1.54:54162]#4# - MANAGE [192.168.1.54:8060]#5#
+	 2138 : CLIENT [192.168.1.54:39869]#11# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#12# connected
+	 2139 : CLIENT [192.168.1.54:39869]#11# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#12# connected
+	 2140 : CLIENT [192.168.1.54:39871]#27# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8091]#28# connected
+	 2141 : CLIENT [192.168.1.54:39871]#27# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#28# connected
+	 2142 : CLIENT [192.168.1.54:39873]#17# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8089]#18# connected
+	 2143 : CLIENT [192.168.1.54:39875]#25# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#26# connected
+	 2144 : CLIENT [192.168.1.54:39875]#25# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#26# connected
+	 2145 : CLIENT [192.168.1.54:39873]#17# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8089]#18# connected
+	 2146 : CLIENT [192.168.1.54:39877]#21# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8091]#22# connected
+	 2147 : CLIENT [192.168.1.54:39877]#21# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#22# connected
+	 2148 : CLIENT [192.168.1.54:39879]#9# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8089]#10# connected
+	 2149 : CLIENT [192.168.1.54:39879]#9# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8089]#10# connected
+	 2150 : CLIENT [192.168.1.54:39881]#15# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#16# connected
+	 2151 : CLIENT [192.168.1.54:39881]#15# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#16# connected
+	 2152 : CLIENT [192.168.1.54:39883]#19# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8091]#20# connected
+	 2153 : CLIENT [192.168.1.54:39884]#23# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8089]#24# connected
+	 2154 : CLIENT [192.168.1.54:39884]#23# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8089]#24# connected
+	 2155 : CLIENT [192.168.1.54:39883]#19# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#20# connected
+	 2156 : CLIENT [192.168.1.54:39887]#13# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#14# connected
+	 2157 : CLIENT [192.168.1.54:39887]#13# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#14# connected
+	> quit
+	Connection closed by foreign host.
+	$
+	
+	注意：慎用dump rules
+	
+7.性能测试
+	因为是简单的通讯转发、分发器，内部使用epoll(ET)+全异步实现，达到高并发和充分负载均衡，几乎可以榨干单核硬件资源。
+	由于我没有完整靠谱的压测环境，只能在我的老爷机上做直连和通过G5转连的性能比较差异。
+	
+	压测硬件（2007年买的老爷机）
+		CPU  : Intel Dual E2160 1.8GHz 1.81GHz
+		内存 : 2GB
+		硬盘 : 希捷 250GB 7200转
+	压测软件
+		Windows XP SP3 ( VMware 6.0 ( RedHat Enterprise Linux 5.4 分了256MB内存 ) )
+	压测场景
+		ab直连apache 和 ab通过G5转发给apache
+		并发数100，总请求数10000次
+	
+	首先是192.168.1.54:*(apache ab)直连192.168.1.79:8090(apache 2.2.13 for win32)，
+
+	Server Software:        Apache/2.2.13
+	Server Hostname:        192.168.1.79
+	Server Port:            8090
+	
+	Document Path:          /index.html
+	Document Length:        44 bytes
+	
+	Concurrency Level:      100
+	Time taken for tests:   12.503706 seconds
+	Complete requests:      10000
+	Failed requests:        0
+	Write errors:           0
+	Total transferred:      3160000 bytes
+	HTML transferred:       440000 bytes
+	Requests per second:    799.76 [#/sec] (mean)
+	Time per request:       125.037 [ms] (mean)
+	Time per request:       1.250 [ms] (mean, across all concurrent requests)
+	Transfer rate:          246.73 [Kbytes/sec] received
+	
+	Connection Times (ms)
+	             min  mean[+/-sd] median   max
+	Connect:        0    0   4.4      0      86
+	Processing:    11  123  31.7    113     283
+	Waiting:        8  122  31.6    112     281
+	Total:         28  123  31.9    113     284
+	
+	Percentage of the requests served within a certain time (ms)
+	 50%    113
+	 66%    115
+	 75%    117
+	 80%    120
+	 90%    163
+	 95%    187
+	 98%    249
+	 99%    256
+	100%    284 (longest request)
+
+	然后是192.168.1.54:*(apache ab)发往192.168.1.54:8080(G5)(主备模式MS)分发给192.168.1.79:8089,8090,8091(apache 2.2.13 for win32)，
+
+	Server Software:        Apache/2.2.13
+	Server Hostname:        192.168.1.54
+	Server Port:            8080
+	
+	Document Path:          /index.html
+	Document Length:        44 bytes
+	
+	Concurrency Level:      100
+	Time taken for tests:   14.235889 seconds
+	Complete requests:      10000
+	Failed requests:        0
+	Write errors:           0
+	Total transferred:      3160000 bytes
+	HTML transferred:       440000 bytes
+	Requests per second:    702.45 [#/sec] (mean)
+	Time per request:       142.359 [ms] (mean)
+	Time per request:       1.424 [ms] (mean, across all concurrent requests)
+	Transfer rate:          216.71 [Kbytes/sec] received
+	
+	Connection Times (ms)
+	             min  mean[+/-sd] median   max
+	Connect:        0    0   8.3      0     154
+	Processing:    25  140  31.3    132     335
+	Waiting:       22  139  31.2    131     334
+	Total:         70  140  32.3    132     338
+	
+	Percentage of the requests served within a certain time (ms)
+	 50%    132
+	 66%    134
+	 75%    137
+	 80%    140
+	 90%    175
+	 95%    190
+	 98%    275
+	 99%    295
+	100%    338 (longest request)
+
+	然后是192.168.1.54:*(apache ab)发往192.168.1.54:8080(G5)(轮询模式RR)分发给192.168.1.79:8089,8090,8091(apache 2.2.13 for win32)，
+
+	Server Software:        Apache/2.2.13
+	Server Hostname:        192.168.1.54
+	Server Port:            8080
+	
+	Document Path:          /index.html
+	Document Length:        44 bytes
+	
+	Concurrency Level:      100
+	Time taken for tests:   14.15712 seconds
+	Complete requests:      10000
+	Failed requests:        0
+	Write errors:           0
+	Total transferred:      3160316 bytes
+	HTML transferred:       440044 bytes
+	Requests per second:    713.48 [#/sec] (mean)
+	Time per request:       140.157 [ms] (mean)
+	Time per request:       1.402 [ms] (mean, across all concurrent requests)
+	Transfer rate:          220.18 [Kbytes/sec] received
+	
+	Connection Times (ms)
+	             min  mean[+/-sd] median   max
+	Connect:        0    0   7.5      0     140
+	Processing:    26  137  67.8     91     342
+	Waiting:       25  137  67.8     90     340
+	Total:         49  138  68.1     91     347
+	
+	Percentage of the requests served within a certain time (ms)
+	 50%     91
+	 66%    178
+	 75%    219
+	 80%    222
+	 90%    229
+	 95%    259
+	 98%    273
+	 99%    279
+	100%    347 (longest request)
+
+	然后是192.168.1.54:*(apache ab)发往192.168.1.54:8080(G5)(最小响应时间模式RT)分发给192.168.1.79:8089,8090,8091(apache 2.2.13 for win32)，
+
+	Server Software:        Apache/2.2.13
+	Server Hostname:        192.168.1.54
+	Server Port:            8080
+	
+	Document Path:          /index.html
+	Document Length:        44 bytes
+	
+	Concurrency Level:      100
+	Time taken for tests:   14.260485 seconds
+	Complete requests:      10000
+	Failed requests:        0
+	Write errors:           0
+	Total transferred:      3160000 bytes
+	HTML transferred:       440000 bytes
+	Requests per second:    701.24 [#/sec] (mean)
+	Time per request:       142.605 [ms] (mean)
+	Time per request:       1.426 [ms] (mean, across all concurrent requests)
+	Transfer rate:          216.33 [Kbytes/sec] received
+	
+	Connection Times (ms)
+	             min  mean[+/-sd] median   max
+	Connect:        0    0   7.7      0     148
+	Processing:    29  140  27.3    133     346
+	Waiting:       26  139  27.2    132     346
+	Total:         65  141  28.4    133     346
+	
+	Percentage of the requests served within a certain time (ms)
+	 50%    133
+	 66%    136
+	 75%    138
+	 80%    140
+	 90%    181
+	 95%    190
+	 98%    241
+	 99%    287
+	100%    346 (longest request)
+
+	然后是192.168.1.54:*(apache ab)发往192.168.1.54:8080(G5)(随机模式RD)分发给192.168.1.79:8089,8090,8091(apache 2.2.13 for win32)，
+
+	Server Software:        Apache/2.2.13
+	Server Hostname:        192.168.1.54
+	Server Port:            8080
+	
+	Document Path:          /index.html
+	Document Length:        44 bytes
+	
+	Concurrency Level:      100
+	Time taken for tests:   14.114779 seconds
+	Complete requests:      10000
+	Failed requests:        0
+	Write errors:           0
+	Total transferred:      3160632 bytes
+	HTML transferred:       440088 bytes
+	Requests per second:    708.48 [#/sec] (mean)
+	Time per request:       141.148 [ms] (mean)
+	Time per request:       1.411 [ms] (mean, across all concurrent requests)
+	Transfer rate:          218.64 [Kbytes/sec] received
+	
+	Connection Times (ms)
+	             min  mean[+/-sd] median   max
+	Connect:        0    0   7.3      0     139
+	Processing:    22  138  67.3     92     354
+	Waiting:       21  138  67.3     92     353
+	Total:         48  139  67.6     92     356
+	
+	Percentage of the requests served within a certain time (ms)
+	 50%     92
+	 66%    184
+	 75%    212
+	 80%    221
+	 90%    239
+	 95%    255
+	 98%    279
+	 99%    292
+	100%    356 (longest request)
+	
+	可以看出，转发的总耗时比直连多了10%左右，大体还是可以接受的，如果G5和WebServer分开部署在不同机器里，G5就能发挥出负载均衡的优势，性能也会大幅提升。
+	以后若有更好的环境，我将会做更全面更深入的压测。
+
+8.最后
+	作为一个负载均衡通讯转发分发网络工具，G5基本实现设计目标，并发布出来分享给开源世界，欢迎使用。
+	G5源代码作为epoll(ET)+全异步综合使用示例也供大家学习参考，欢迎批评指正。
+	如有问题或建议欢迎联系我
+	开源项目首页 : http://git.oschina.net/calvinwilliams/G5
+	作者邮箱 : calvinwilliams.c@gmail.com
+
+附录A.待开发内容
+（无）
