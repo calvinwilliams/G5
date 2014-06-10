@@ -1,8 +1,8 @@
 /*
- * TCP Transfer && LB Dispenser - G5
+ * G5 - TCP Transfer && LB Dispenser
  * Author      : calvin
  * Email       : calvinwillliams.c@gmail.com
- * LastVersion : v1.2.2
+ * LastVersion : v1.2.3
  *
  * Licensed under the LGPL v2.1, see the file LICENSE in base directory.
  */
@@ -10,7 +10,7 @@
 #ifndef _H_G5_
 #define _H_G5_
 
-#define VERSION		"1.2.1"
+#define VERSION		"1.2.3"
 
 #define SERVICE_NAME	"G5"
 #define SERVICE_DESC	"TCP Transfer && Load-Balance Dispenser"
@@ -143,92 +143,92 @@ demo :
 #define ssize_t		int
 #endif
 
-#define FOUND				9	/* 找到 */
-#define NOT_FOUND			4	/* 找不到 */
+#define FOUND				9	/* 找到 */ /* found */
+#define NOT_FOUND			4	/* 找不到 */ /* not found */
 
-#define MATCH				1	/* 匹配 */
-#define NOT_MATCH			-1	/* 不匹配 */
+#define MATCH				1	/* 匹配 */ /* match */
+#define NOT_MATCH			-1	/* 不匹配 */ /* not match */
 
-#define RULE_ID_MAXLEN			64	/* 最长转发规则名长度 */
-#define RULE_MODE_MAXLEN		2	/* 最长转发规则模式长度 */
+#define RULE_ID_MAXLEN			64	/* 最长转发规则名长度 */ /* The longest length of forwarding rules */
+#define RULE_MODE_MAXLEN		2	/* 最长转发规则模式长度 */ /* The longest length of forwarding rules mode */
 
-#define FORWARD_RULE_MODE_G		"G"	/* 管理端口 */
-#define FORWARD_RULE_MODE_MS		"MS"	/* 主备模式 */
-#define FORWARD_RULE_MODE_RR		"RR"	/* 轮询模式 */
-#define FORWARD_RULE_MODE_LC		"LC"	/* 最少连接模式 */
-#define FORWARD_RULE_MODE_RT		"RT"	/* 最小响应时间模式 */
-#define FORWARD_RULE_MODE_RD		"RD"	/* 随机模式 */
-#define FORWARD_RULE_MODE_HS		"HS"	/* HASH模式 */
+#define FORWARD_RULE_MODE_G		"G"	/* 管理端口 */ /* manager port */
+#define FORWARD_RULE_MODE_MS		"MS"	/* 主备模式 */ /* master-standby mode */
+#define FORWARD_RULE_MODE_RR		"RR"	/* 轮询模式 */ /* polling mode */
+#define FORWARD_RULE_MODE_LC		"LC"	/* 最少连接模式 */ /* minimum number of connections mode */
+#define FORWARD_RULE_MODE_RT		"RT"	/* 最小响应时间模式 */ /* minimum response time mode */
+#define FORWARD_RULE_MODE_RD		"RD"	/* 随机模式 */ /* random mode */
+#define FORWARD_RULE_MODE_HS		"HS"	/* HASH模式 */ /* HASH mode */
 
-#define RULE_CLIENT_MAXCOUNT		10	/* 单条规则中最大客户端配置数量 */
-#define RULE_FORWARD_MAXCOUNT		3	/* 单条规则中最大转发端配置数量 */
-#define RULE_SERVER_MAXCOUNT		100	/* 单条规则中最大服务端配置数量 */
+#define RULE_CLIENT_MAXCOUNT		10	/* 单条规则中最大客户端配置数量 */ /* maximum clients in rule */
+#define RULE_FORWARD_MAXCOUNT		3	/* 单条规则中最大转发端配置数量 */ /* maximum forwards in rule */
+#define RULE_SERVER_MAXCOUNT		100	/* 单条规则中最大服务端配置数量 */ /* maximum servers in rule */
 
-#define DEFAULT_FORWARD_RULE_MAXCOUNT	100	/* 缺省最大转发规则数量 */
-#define DEFAULT_CONNECTION_MAXCOUNT	1024	/* 缺省最大连接数量 */ /* 最大转发会话数量 = 最大连接数量 * 3 */
-#define DEFAULT_TRANSFER_BUFSIZE	4096	/* 缺省通讯转发缓冲区大小 */
+#define DEFAULT_FORWARD_RULE_MAXCOUNT	100	/* 缺省最大转发规则数量 */ /* maximum forward rules for default */
+#define DEFAULT_CONNECTION_MAXCOUNT	1024	/* 缺省最大连接数量 */ /* 最大转发会话数量 = 最大连接数量 * 3 */ /* maximum connections for default */
+#define DEFAULT_TRANSFER_BUFSIZE	4096	/* 缺省通讯转发缓冲区大小 */ /* communication I/O buffer for default */
 
-/* 网络地址信息结构 */
+/* 网络地址信息结构 */ /* network address information structure */
 struct NetAddress
 {
-	char			ip[ 64 + 1 ] ; /* ip地址 */
-	char			port[ 10 + 1 ] ; /* 端口 */
-	struct sockaddr_in	sockaddr ; /* sock地址结构 */
+	char			ip[ 64 + 1 ] ; /* ip地址 */ /* ip address */
+	char			port[ 10 + 1 ] ; /* 端口 */ /* port */
+	struct sockaddr_in	sockaddr ; /* sock地址结构 */ /* sock structure */
 } ;
 
-/* 客户端信息结构 */
+/* 客户端信息结构 */ /* client information structure */
 struct ClientNetAddress
 {
-	struct NetAddress	netaddr ; /* 网络地址结构 */
-	int			sock ; /* sock描述字 */
+	struct NetAddress	netaddr ; /* 网络地址结构 */ /* network address structure */
+	int			sock ; /* sock描述字 */ /* sock fd */
 	
-	unsigned long		client_connection_count ; /* 客户端连接数量 */
-	unsigned long		maxclients ; /* 最大客户端数量 */
+	unsigned long		client_connection_count ; /* 客户端连接数量 */ /* client number of connections */
+	unsigned long		maxclients ; /* 最大客户端数量 */ /* amount of clients */
 } ;
 
-/* 转发端信息结构 */
+/* 转发端信息结构 */ /* forward information structure */
 struct ForwardNetAddress
 {
-	struct NetAddress	netaddr ; /* 网络地址结构 */
-	int			sock ; /* sock描述字 */
+	struct NetAddress	netaddr ; /* 网络地址结构 */ /* network address structure */
+	int			sock ; /* sock描述字 */ /* sock fd */
 } ;
 
-/* 服务端信息结构 */
+/* 服务端信息结构 */ /* server information structure */
 struct ServerNetAddress
 {
-	struct NetAddress	netaddr ; /* 网络地址结构 */
-	int			sock ; /* sock描述字 */
+	struct NetAddress	netaddr ; /* 网络地址结构 */ /* network address structure */
+	int			sock ; /* sock描述字 */ /* sock fd */
 	
-	unsigned long		server_connection_count ; /* 服务端连接数量 */
+	unsigned long		server_connection_count ; /* 服务端连接数量 */ /* server connection number */
 } ;
 
 #define SERVER_UNABLE_IGNORE_COUNT	100 /* 服务端不可用时最大暂禁次数 */
 
-/* 统计端信息结构 */
+/* 统计端信息结构 */ /* stat information structure */
 struct StatNetAddress
 {
-	struct NetAddress	netaddr ; /* 网络地址结构 */
+	struct NetAddress	netaddr ; /* 网络地址结构 */ /* network address structure */
 	
-	unsigned long		connection_count ; /* 连接数量 */
+	unsigned long		connection_count ; /* 连接数量 */ /* number of connections */
 } ;
 
-/* 转发规则结构 */
+/* 转发规则结构 */ /* forwarding rules structure */
 struct ForwardRule
 {
-	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* 规则ID（字符串） */
-	char				rule_mode[ RULE_MODE_MAXLEN + 1 ] ; /* 规则类型 */
+	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* 规则ID（字符串） */ /* rule id */
+	char				rule_mode[ RULE_MODE_MAXLEN + 1 ] ; /* 规则类型 */ /* rule mode */
 	
 	long				timeout ; /* 超时时间（秒） */
 	
-	struct ClientNetAddress		client_addr[ RULE_CLIENT_MAXCOUNT ] ; /* 客户端地址结构 */
+	struct ClientNetAddress		client_addr[ RULE_CLIENT_MAXCOUNT ] ; /* 客户端地址结构 */ /* client address structure */
 	unsigned long			client_count ; /* 客户端规则配置数量 */
 	
-	struct ForwardNetAddress	forward_addr[ RULE_FORWARD_MAXCOUNT ] ; /* 转发端地址结构 */
+	struct ForwardNetAddress	forward_addr[ RULE_FORWARD_MAXCOUNT ] ; /* 转发端地址结构 */ /* forward information structure */
 	unsigned long			forward_count ; /* 转发端规则配置数量 */
 	
-	struct ServerNetAddress		server_addr[ RULE_SERVER_MAXCOUNT ] ; /* 服务端地址结构 */
+	struct ServerNetAddress		server_addr[ RULE_SERVER_MAXCOUNT ] ; /* 服务端地址结构 */ /* server information structure */
 	unsigned long			server_count ; /* 服务端规则配置数量 */
-	unsigned long			select_index ; /* 当前服务端索引 */
+	unsigned long			select_index ; /* 当前服务端索引 */ /* current server index */
 	
 	union
 	{
@@ -265,16 +265,16 @@ struct ForwardRule
 
 #define TRY_CONNECT_MAXCOUNT		5	/* 异步尝试连接服务端最大次数 */
 
-/* 侦听会话结构 */
+/* 侦听会话结构 */ /* listen to the session structure  */
 struct ListenNetAddress
 {
-	struct NetAddress	netaddr ; /* 网络地址结构 */
-	int			sock ; /* sock描述字 */
+	struct NetAddress	netaddr ; /* 网络地址结构 */ /* network address structure */
+	int			sock ; /* sock描述字 */ /* sock fd */
 	
-	char			rule_mode[ 2 + 1 ] ; /* 规则类型 */
+	char			rule_mode[ 2 + 1 ] ; /* 规则类型 */ /* rule mode */
 } ;
 
-/* 转发会话结构 */
+/* 转发会话结构 */ /* forwarding session structure */
 struct ForwardSession
 {
 	char				forward_session_type ; /* 转发会话类型 */
@@ -286,7 +286,9 @@ struct ForwardSession
 	unsigned long			server_session_index ; /* 服务端会话索引 */
 	
 	struct ForwardRule		*p_forward_rule ; /* 转发规则指针 */
+	struct ForwardRule		old_forward_rule ; /* 在线变更后的老转发规则 */
 	unsigned long			client_index ; /* 客户端索引 */
+	unsigned long			server_index ; /* 服务端索引 */
 	
 	unsigned char			status ; /* 会话状态 */
 	unsigned long			try_connect_count ; /* 尝试连接服务端次数 */
@@ -297,7 +299,7 @@ struct ForwardSession
 	long				io_buflen ; /* 输入输出缓冲区中数据长度 */
 } ;
 
-/* 命令行参数结构 */
+/* 命令行参数结构 */ /* command line argument structure */
 struct CommandParam
 {
 	char				*config_pathfilename ; /* -f ... */
@@ -313,7 +315,7 @@ struct CommandParam
 	char				service_flag ; /* --service */
 } ;
 
-/* 内部缓存结构 */
+/* 内部缓存结构 */ /* internal cache structure */
 struct ServerCache
 {
 	struct timeval			tv ;
@@ -321,7 +323,7 @@ struct ServerCache
 	char				datetime[ 10 + 1 + 8 + 1 ] ;
 } ;
 
-/* 服务器环境大结构 */
+/* 服务器环境大结构 */ /* server environment structure */
 
 #define WAIT_EVENTS_COUNT		1024	/* 等待事件集合数量 */
 

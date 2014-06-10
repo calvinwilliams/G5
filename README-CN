@@ -208,6 +208,8 @@
 	 2155 : CLIENT [192.168.1.54:39883]#19# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8091]#20# connected
 	 2156 : CLIENT [192.168.1.54:39887]#13# < LISTEN [192.168.1.54:8080]#8# - SERVER [192.168.1.79:8090]#14# connected
 	 2157 : CLIENT [192.168.1.54:39887]#13# - LISTEN [192.168.1.54:8080]#8# > SERVER [192.168.1.79:8090]#14# connected
+	> clean forwards
+	clean forwards ok
 	> quit
 	Connection closed by foreign host.
 	$

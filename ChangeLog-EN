@@ -1,3 +1,8 @@
+ver 1.2.3	2014-06-10	calvin
+		* now disconnect has not mandatory on online change forwarding rules , the command "clean forwards" is used to force disconnect the old sessions
+		* optimizes the load balancing algorithm LC,RT
+		* add comments in English
+		
 ver 1.2.2	2014-05-24	calvin
 		* add english document
 
