@@ -72,9 +72,7 @@ DFTHDER		=	$(csm_FILE_DFTHDER) $(cui_FILE_DFTHDER) $(dtd_FILE_DFTHDER) $(prt_FIL
 
 # 提交安装规则
 .PHONY:install
-install		:
-	@make
-
+install		:	all
 ifneq ($(strip $(BIN)),)
 ifneq ($(strip $(BININST)),)
 	@if [ ! -d "$(BININST)" ] ; then \
