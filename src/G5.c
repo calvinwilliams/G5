@@ -341,7 +341,7 @@ static int CloseSocketWithRuleForcely( struct ServerEnv *pse )
 }
 
 /* 如果没有绑定侦听端口，绑定之，并登记到epoll池 */ /* If there is no binding listener port, bindings, and register to the epoll pool */
-static int BinListenSocket( struct ServerEnv *pse , struct ForwardRule *p_forward_rule , struct ForwardNetAddress *p_forward_addr )
+static int BindListenSocket( struct ServerEnv *pse , struct ForwardRule *p_forward_rule , struct ForwardNetAddress *p_forward_addr )
 {
 	unsigned long		forward_session_index ;
 	struct ForwardSession	*p_forward_session = NULL ;
@@ -453,10 +453,10 @@ static int AddForwardRule( struct ServerEnv *pse , struct ForwardRule *p_forward
 	if( strcmp( p_forward_rule->rule_mode , FORWARD_RULE_MODE_G ) == 0 )
 	{
 	*/
-		nret = BinListenSocket( pse , p_forward_rule , p_forward_rule->forward_addr ) ;
+		nret = BindListenSocket( pse , p_forward_rule , p_forward_rule->forward_addr ) ;
 		if( nret < 0 )
 		{
-			ErrorOutput( pse , "BinListenSocket failed[%d]\r\n" , nret );
+			ErrorOutput( pse , "BindListenSocket failed[%d]\r\n" , nret );
 			return -3;
 		}
 	/*
@@ -485,10 +485,10 @@ static int ModifyForwardRule( struct ServerEnv *pse , struct ForwardRule *p_forw
 	
 	if( strcmp( p_forward_rule->rule_mode , FORWARD_RULE_MODE_G ) == 0 )
 	{
-		nret = BinListenSocket( pse , p_forward_rule , p_forward_rule->forward_addr ) ;
+		nret = BindListenSocket( pse , p_forward_rule , p_forward_rule->forward_addr ) ;
 		if( nret < 0 )
 		{
-			ErrorOutput( pse , "BinListenSocket failed[%d]\r\n" , nret );
+			ErrorOutput( pse , "BindListenSocket failed[%d]\r\n" , nret );
 			return -2;
 		}
 		else if( nret == 0 )
@@ -741,7 +741,7 @@ static int LoadForwardConfig( struct ServerEnv *pse , char *buffer , char *rule_
 			InfoOutputNoPrefix( pse , " %s:%s" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port );
 			
 			/*
-			nret = BinListenSocket( pse , p_forward_rule , p_forward_addr ) ;
+			nret = BindListenSocket( pse , p_forward_rule , p_forward_addr ) ;
 			if( nret < 0 )
 			{
 				return nret;
