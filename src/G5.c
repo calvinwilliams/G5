@@ -2,7 +2,6 @@
  * TCP Transfer && LB Dispenser - G5
  * Author      : calvin
  * Email       : calvinwillliams.c@gmail.com
- * LastVersion : v1.2.3
  *
  * Licensed under the LGPL v2.1, see the file LICENSE in base directory.
  */
@@ -1559,7 +1558,7 @@ static int TransferSocketData( struct ServerEnv *pse , struct ForwardSession *p_
 	struct ForwardSession	*p_in_forward_session = NULL ;
 	struct ForwardSession	*p_out_forward_session = NULL ;
 	
-	ssize_t			len ;
+	int			len ;
 	
 	if( p_forward_session->forward_session_type == FORWARD_SESSION_TYPE_CLIENT )
 	{
@@ -1643,7 +1642,7 @@ static int TransferSocketData( struct ServerEnv *pse , struct ForwardSession *p_
 		/* 发送通讯数据 */ /* Sending communications data */
 		while( p_out_forward_session->io_buflen > 0 )
 		{
-			len = send( out_sock , p_out_forward_session->io_buffer , p_out_forward_session->io_buflen , 0 ) ;
+			len = (int)send( out_sock , p_out_forward_session->io_buffer , p_out_forward_session->io_buflen , 0 ) ;
 			if( len < 0 )
 			{
 				if( _ERRNO == _EWOULDBLOCK )
@@ -1733,7 +1732,7 @@ static int ContinueToWriteSocketData( struct ServerEnv *pse , struct ForwardSess
 	struct ForwardSession	*p_in_forward_session = NULL ;
 	struct ForwardSession	*p_out_forward_session = NULL ;
 	
-	ssize_t			len ;
+	int			len ;
 	
 	if( p_forward_session->forward_session_type == FORWARD_SESSION_TYPE_SERVER )
 	{
@@ -1757,7 +1756,7 @@ static int ContinueToWriteSocketData( struct ServerEnv *pse , struct ForwardSess
 	while( p_out_forward_session->io_buflen > 0 )
 	{
 		/* 发送通讯数据 */ /* sending communications data */
-		len = send( out_sock , p_out_forward_session->io_buffer , p_out_forward_session->io_buflen , 0 ) ;
+		len = (int)send( out_sock , p_out_forward_session->io_buffer , p_out_forward_session->io_buflen , 0 ) ;
 		pse->forward_session[p_forward_session->server_session_index].active_timestamp = pse->server_cache.tv.tv_sec ;
 		pse->forward_session[p_forward_session->client_session_index].active_timestamp = pse->server_cache.tv.tv_sec ;
 		if( len < 0 )
@@ -2184,8 +2183,8 @@ static int ReceiveOrProcessManageData( struct ServerEnv *pse , struct ForwardSes
 	int		out_sock ;
 	
 	char		*p_manage_buffer_offset = NULL ;
-	ssize_t		manage_input_remain_bufsize ;
-	ssize_t		recv_len ;
+	int		manage_input_remain_bufsize ;
+	int		recv_len ;
 	char		*p = NULL ;
 	
 	int		nret = 0 ;
@@ -2208,7 +2207,7 @@ static int ReceiveOrProcessManageData( struct ServerEnv *pse , struct ForwardSes
 			SetForwardSessionUnitUnused( pse , p_forward_session );
 			return 0;
 		}
-		recv_len = recv( in_sock , p_manage_buffer_offset , manage_input_remain_bufsize , 0 ) ;
+		recv_len = (int)recv( in_sock , p_manage_buffer_offset , manage_input_remain_bufsize , 0 ) ;
 		p_forward_session->active_timestamp = pse->server_cache.tv.tv_sec ;
 		if( recv_len < 0 )
 		{

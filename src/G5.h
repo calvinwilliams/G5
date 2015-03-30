@@ -2,7 +2,6 @@
  * G5 - TCP Transfer && LB Dispenser
  * Author      : calvin
  * Email       : calvinwillliams.c@gmail.com
- * LastVersion : v1.2.3
  *
  * Licensed under the LGPL v2.1, see the file LICENSE in base directory.
  */
@@ -10,7 +9,7 @@
 #ifndef _H_G5_
 #define _H_G5_
 
-#define VERSION		"1.2.3"
+#define VERSION		"1.2.4"
 
 #define SERVICE_NAME	"G5"
 #define SERVICE_DESC	"TCP Transfer && Load-Balance Dispenser"
@@ -133,14 +132,6 @@ demo :
 
 #ifndef ULONG_MAX
 #define ULONG_MAX 0xffffffffUL
-#endif
-
-#ifndef size_t
-#define size_t		unsigned int
-#endif
-
-#ifndef ssize_t
-#define ssize_t		int
 #endif
 
 #define FOUND				9	/* ’“µΩ */ /* found */
