@@ -9,7 +9,7 @@
 #ifndef _H_G5_
 #define _H_G5_
 
-#define VERSION		"1.2.4"
+#define VERSION		"1.2.5"
 
 #define SERVICE_NAME	"G5"
 #define SERVICE_DESC	"TCP Transfer && Load-Balance Dispenser"
@@ -87,6 +87,8 @@ demo :
 #define _ECONNABORTED		ECONNABORTED
 #define _EINPROGRESS		EINPROGRESS
 #define _ECONNRESET		ECONNRESET
+#define _ENOTCONN		ENOTCONN
+#define _EISCONN		EISCONN
 #define _SOCKLEN_T		socklen_t
 #define _GETTIMEOFDAY(_tv_)	gettimeofday(&(_tv_),NULL)
 #define _LOCALTIME(_tt_,_stime_) \
@@ -105,6 +107,8 @@ demo :
 #define _ECONNABORTED		WSAECONNABORTED
 #define _EINPROGRESS		WSAEINPROGRESS
 #define _ECONNRESET		WSAECONNRESET
+#define _ENOTCONN		WSAENOTCONN
+#define _EISCONN		WSAEISCONN
 #define _SOCKLEN_T		int
 #define _GETTIMEOFDAY(_tv_) \
 	{ \

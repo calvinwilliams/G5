@@ -1,3 +1,6 @@
+ver 1.2.5	2015-04-15	calvin
+		* Fixed a problem about connect failed
+
 ver 1.2.4	2015-03-30	calvin
 		* Fixed compile problem on Linux 64bits
 		* Create doc/G5.vsd

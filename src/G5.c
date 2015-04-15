@@ -1539,7 +1539,7 @@ static int AcceptForwardSocket( struct ServerEnv *pse , struct ForwardSession *p
 		}
 		
 		/* 连接目标网络地址 */ /* connect target network address */
-		nret = ConnectToRemote( pse , p_forward_session , p_forward_rule , client_index , & client_addr , TRY_CONNECT_MAXCOUNT ) ;
+		nret = ConnectToRemote( pse , p_forward_session , p_forward_rule , client_index , & client_addr , p_forward_rule->server_count ) ;
 		if( nret )
 		{
 			_CLOSESOCKET( client_addr.sock );
@@ -1771,7 +1771,7 @@ static int ContinueToWriteSocketData( struct ServerEnv *pse , struct ForwardSess
 			}
 			else
 			{
-				ErrorOutput( pse , "close #%d# send error , close #%d# passivity\r\n" , in_sock , out_sock );
+				ErrorOutput( pse , "close2 #%d# send error , close #%d# passivity\r\n" , in_sock , out_sock );
 				pse->forward_session[p_forward_session->client_session_index].p_forward_rule->client_addr[p_forward_session->client_index].client_connection_count--;
 				pse->forward_session[p_forward_session->server_session_index].p_forward_rule->server_addr[p_forward_session->server_index].server_connection_count--;
 #ifdef USE_EPOLL
@@ -2296,9 +2296,73 @@ static int ReceiveOrProcessManageData( struct ServerEnv *pse , struct ForwardSes
 	return 0;
 }
 
+/* 解决sock错误处理 */ /* to solve the error sock handling */
+static int ResolveSocketError( struct ServerEnv *pse , struct ForwardSession *p_forward_session )
+{
+	int		nret = 0 ;
+	
+	/* 如果是异步连接错误事件 */
+	if( p_forward_session->forward_session_type == FORWARD_SESSION_TYPE_SERVER && p_forward_session->status == CONNECT_STATUS_CONNECTING )
+	{
+		ErrorOutput( pse , "connect2 to [%s:%s] failed\r\n" , p_forward_session->server_addr.netaddr.ip , p_forward_session->server_addr.netaddr.port );
+		
+		/* 处理目标网络地址不可用错误 */
+		nret = OnServerUnable( pse , p_forward_session->p_forward_rule ) ;
+		if( nret )
+		{
+			goto _CLOSE_PAIR;
+		}
+		if( p_forward_session->try_connect_count <= 0 )
+		{
+			goto _CLOSE_PAIR;
+		}
+		
+		/* 连接其它目标网络地址 */
+		p_forward_session->try_connect_count--;
+		nret = ConnectToRemote( pse , p_forward_session , p_forward_session->p_forward_rule , p_forward_session->client_index , & (p_forward_session->client_addr) , p_forward_session->try_connect_count ) ;
+		
+		/* 从epoll池中删除客户端sock */
+		p_forward_session->p_forward_rule->client_addr[p_forward_session->client_index].client_connection_count--;
+		p_forward_session->p_forward_rule->server_addr[p_forward_session->p_forward_rule->select_index].server_connection_count--;
+#ifdef USE_EPOLL
+		epoll_ctl( pse->epoll_fds , EPOLL_CTL_DEL , p_forward_session->server_addr.sock , NULL );
+#endif
+		_CLOSESOCKET( p_forward_session->server_addr.sock );
+		SetForwardSessionUnitUnused( pse , p_forward_session );
+		
+		if( nret )
+		{
+			goto _CLOSE_PAIR;
+		}
+	}
+	/* 如果是转发错误事件 */
+	else
+	{
+_CLOSE_PAIR :
+		/* 从epoll池中删除转发两端信息、删除转发会话 */
+		ErrorOutput( pse , "close #%d# - #%d# EPOLLERR\r\n" , p_forward_session->client_addr.sock , p_forward_session->server_addr.sock );
+		pse->forward_session[p_forward_session->server_session_index].p_forward_rule->client_addr[p_forward_session->client_index].client_connection_count--;
+		pse->forward_session[p_forward_session->server_session_index].p_forward_rule->server_addr[p_forward_session->server_session_index].server_connection_count--;
+#ifdef USE_EPOLL
+		epoll_ctl( pse->epoll_fds , EPOLL_CTL_DEL , p_forward_session->client_addr.sock , NULL );
+		epoll_ctl( pse->epoll_fds , EPOLL_CTL_DEL , p_forward_session->server_addr.sock , NULL );
+#endif
+		_CLOSESOCKET( p_forward_session->client_addr.sock );
+		_CLOSESOCKET( p_forward_session->server_addr.sock );
+		SetForwardSessionUnitUnused2( pse , & (pse->forward_session[p_forward_session->client_session_index]) , & (pse->forward_session[p_forward_session->server_session_index]) );
+	}
+	
+	return 0;
+}
+
 /* 异步连接目标网络地址后回调，连接成功后登记到epoll池 */ /* asynchronous callback after connecting target network address, registration to the epoll pool after a successful connection */
 static int SetSocketConnected( struct ServerEnv *pse , struct ForwardSession *p_forward_session_server )
 {
+#if ( defined __linux ) || ( defined __unix )
+	int			error , code ;
+#endif
+	_SOCKLEN_T		addr_len ;
+	
 	struct ForwardSession	*p_forward_session_client = NULL ;
 #ifdef USE_EPOLL
 	struct epoll_event	client_event ;
@@ -2306,6 +2370,26 @@ static int SetSocketConnected( struct ServerEnv *pse , struct ForwardSession *p_
 #endif
 	
 	int			nret = 0 ;
+	
+#if ( defined __linux ) || ( defined __unix )
+	addr_len = sizeof(int) ;
+	code = getsockopt( p_forward_session_server->server_addr.sock , SOL_SOCKET , SO_ERROR , & error , & addr_len ) ;
+	if( code < 0 || error )
+	{
+		return ResolveSocketError( pse , p_forward_session_server );
+	}
+#elif ( defined _WIN32 )
+	addr_len = sizeof(struct sockaddr_in) ;
+	nret = connect( p_forward_session_server->server_addr.sock , ( struct sockaddr *) & (p_forward_session_server->server_addr.netaddr.sockaddr) , addr_len ) ;
+	if( nret == -1 && _ERRNO == _EISCONN )
+	{
+		;
+	}
+	else
+        {
+		return ResolveSocketError( pse , p_forward_session_server );
+        }
+#endif
 	
 	/* 查询epoll池未用单元 */
 	nret = GetForwardSessionUnusedUnit( pse , & p_forward_session_client ) ;
@@ -2358,64 +2442,6 @@ static int SetSocketConnected( struct ServerEnv *pse , struct ForwardSession *p_
 		, p_forward_session_client->client_addr.netaddr.ip , p_forward_session_client->client_addr.netaddr.port , p_forward_session_client->client_addr.sock
 		, p_forward_session_server->listen_addr.netaddr.ip , p_forward_session_server->listen_addr.netaddr.port , p_forward_session_server->listen_addr.sock
 		, p_forward_session_server->server_addr.netaddr.ip , p_forward_session_server->server_addr.netaddr.port , p_forward_session_server->server_addr.sock );
-	
-	return 0;
-}
-
-/* 解决sock错误处理 */ /* to solve the error sock handling */
-static int ResolveSocketError( struct ServerEnv *pse , struct ForwardSession *p_forward_session )
-{
-	int		nret = 0 ;
-	
-	/* 如果是异步连接错误事件 */
-	if( p_forward_session->forward_session_type == FORWARD_SESSION_TYPE_SERVER && p_forward_session->status == CONNECT_STATUS_CONNECTING )
-	{
-		ErrorOutput( pse , "connect2 to [%s:%s] failed\r\n" , p_forward_session->server_addr.netaddr.ip , p_forward_session->server_addr.netaddr.port );
-		
-		/* 处理目标网络地址不可用错误 */
-		nret = OnServerUnable( pse , p_forward_session->p_forward_rule ) ;
-		if( nret )
-		{
-			goto _CLOSE_PAIR;
-		}
-		if( p_forward_session->try_connect_count <= 0 )
-		{
-			goto _CLOSE_PAIR;
-		}
-		
-		/* 连接其它目标网络地址 */
-		nret = ConnectToRemote( pse , p_forward_session , p_forward_session->p_forward_rule , p_forward_session->client_index , & (p_forward_session->client_addr) , --p_forward_session->try_connect_count ) ;
-		
-		/* 从epoll池中删除客户端sock */
-		p_forward_session->p_forward_rule->client_addr[p_forward_session->client_index].client_connection_count--;
-		p_forward_session->p_forward_rule->server_addr[p_forward_session->p_forward_rule->select_index].server_connection_count--;
-#ifdef USE_EPOLL
-		epoll_ctl( pse->epoll_fds , EPOLL_CTL_DEL , p_forward_session->server_addr.sock , NULL );
-#endif
-		_CLOSESOCKET( p_forward_session->server_addr.sock );
-		SetForwardSessionUnitUnused( pse , p_forward_session );
-		
-		if( nret )
-		{
-			goto _CLOSE_PAIR;
-		}
-	}
-	/* 如果是转发错误事件 */
-	else
-	{
-_CLOSE_PAIR :
-		/* 从epoll池中删除转发两端信息、删除转发会话 */
-		ErrorOutput( pse , "close #%d# - #%d# EPOLLERR\r\n" , p_forward_session->client_addr.sock , p_forward_session->server_addr.sock );
-		pse->forward_session[p_forward_session->server_session_index].p_forward_rule->client_addr[p_forward_session->client_index].client_connection_count--;
-		pse->forward_session[p_forward_session->server_session_index].p_forward_rule->server_addr[p_forward_session->server_session_index].server_connection_count--;
-#ifdef USE_EPOLL
-		epoll_ctl( pse->epoll_fds , EPOLL_CTL_DEL , p_forward_session->client_addr.sock , NULL );
-		epoll_ctl( pse->epoll_fds , EPOLL_CTL_DEL , p_forward_session->server_addr.sock , NULL );
-#endif
-		_CLOSESOCKET( p_forward_session->client_addr.sock );
-		_CLOSESOCKET( p_forward_session->server_addr.sock );
-		SetForwardSessionUnitUnused2( pse , & (pse->forward_session[p_forward_session->client_session_index]) , & (pse->forward_session[p_forward_session->server_session_index]) );
-	}
 	
 	return 0;
 }
