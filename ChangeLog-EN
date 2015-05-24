@@ -1,3 +1,6 @@
+ver 1.2.6	2015-05-24	calvin
+		* Fixed a problem about include sys/epoll.h , thanks to liupengc@si-tech.com.cn
+		
 ver 1.2.5	2015-04-15	calvin
 		* Fixed a problem about connect failed
 

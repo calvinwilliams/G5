@@ -9,7 +9,7 @@
 #ifndef _H_G5_
 #define _H_G5_
 
-#define VERSION		"1.2.5"
+#define VERSION		"1.2.6"
 
 #define SERVICE_NAME	"G5"
 #define SERVICE_DESC	"TCP Transfer && Load-Balance Dispenser"
@@ -68,7 +68,9 @@ demo :
 #include <string.h>
 #include <errno.h>
 #include <sys/socket.h>
+#if ( defined USE_EPOLL )
 #include <sys/epoll.h>
+#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
